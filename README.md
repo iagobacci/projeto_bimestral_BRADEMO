@@ -1,3 +1,3 @@
-# trabalho01
+#Trabalho 01
 
-A new Flutter project.
+Trabalho bimestral da matéria de Desenvolvimento Mobile com Flutter.
