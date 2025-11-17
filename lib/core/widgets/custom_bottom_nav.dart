@@ -58,7 +58,7 @@ class CustomBottomNav extends StatelessWidget {
               ),
               onPressed: tapAction,
             );
-          }).toList(),
+          }),
         ],
       ),
     );

@@ -57,7 +57,7 @@ class SplashScreen extends StatelessWidget {
               
               // Botão Começar Agora
               ElevatedButton( 
-                onPressed: () => controller.navigateToHome(context),
+                onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: baseGreen,
                   padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 15),
@@ -66,7 +66,7 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'Comece Agora',
+                  'Fazer Login',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,

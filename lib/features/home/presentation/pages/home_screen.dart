@@ -59,7 +59,10 @@ class _HomeState extends State<Home> {
               ),
             ),
             ListTile(leading: const Icon(Icons.home, color: Colors.white), title: const Text('Home', style: TextStyle(color: Colors.white)), onTap: () => Navigator.pop(context)),
-            ListTile(leading: const Icon(Icons.person, color: Colors.white), title: const Text('Perfil', style: TextStyle(color: Colors.white)), onTap: () => Navigator.pop(context)),
+            ListTile(leading: const Icon(Icons.person, color: Colors.white), title: const Text('Alunos', style: TextStyle(color: Colors.white)), onTap: () {Navigator.pop(context); Navigator.pushNamed(context, '/alunos');}),
+            ListTile(leading: const Icon(Icons.fitness_center, color: Colors.white), title: const Text('Atividades', style: TextStyle(color: Colors.white)), onTap: () {Navigator.pop(context); Navigator.pushNamed(context, '/atividades');}),
+            ListTile(leading: const Icon(Icons.favorite, color: Colors.white), title: const Text('Medições', style: TextStyle(color: Colors.white)), onTap: () {Navigator.pop(context); Navigator.pushNamed(context, '/medicoes');}),
+            ListTile(leading: const Icon(Icons.bar_chart, color: Colors.white), title: const Text('Relatórios', style: TextStyle(color: Colors.white)), onTap: () {Navigator.pop(context); Navigator.pushNamed(context, '/relatorios');}),
             ListTile(leading: const Icon(Icons.settings, color: Colors.white), title: const Text('Configurações', style: TextStyle(color: Colors.white)), onTap: () => Navigator.pop(context)),
             ListTile(leading: const Icon(Icons.help, color: Colors.white), title: const Text('Ajuda / Suporte', style: TextStyle(color: Colors.white)), onTap: () => Navigator.pop(context)),
             ListTile(leading: const Icon(Icons.logout, color: Colors.white), title: const Text('Sair', style: TextStyle(color: Colors.white)), onTap: () {Navigator.pushNamedAndRemoveUntil(context, '/splash', (Route<dynamic> route) => false);
