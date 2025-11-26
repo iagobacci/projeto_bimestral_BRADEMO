@@ -1,4 +1,2 @@
-# trabalho01
-
-A new Flutter project.
-# trabalho_brademo
+# Trabalho 01
+Trabalho bimestral da matéria de Desenvolvimento Mobile com Flutter.
