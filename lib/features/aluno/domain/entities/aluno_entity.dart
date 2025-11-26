@@ -7,6 +7,8 @@ class AlunoEntity {
   final String? genero;
   final double? peso;
   final double? altura;
+  final String? personalId; // ID do personal trainer responsável
+  final String? userId; // ID do usuário no Firebase Auth (quando aluno cria conta)
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -19,6 +21,8 @@ class AlunoEntity {
     this.genero,
     this.peso,
     this.altura,
+    this.personalId,
+    this.userId,
     required this.createdAt,
     this.updatedAt,
   });
@@ -32,6 +36,8 @@ class AlunoEntity {
       'genero': genero,
       'peso': peso,
       'altura': altura,
+      'personalId': personalId,
+      'userId': userId,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -47,6 +53,8 @@ class AlunoEntity {
       genero: map['genero'],
       peso: map['peso']?.toDouble(),
       altura: map['altura']?.toDouble(),
+      personalId: map['personalId'],
+      userId: map['userId'],
       createdAt: DateTime.parse(map['createdAt']),
       updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
     );
@@ -61,6 +69,8 @@ class AlunoEntity {
     String? genero,
     double? peso,
     double? altura,
+    String? personalId,
+    String? userId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -73,6 +83,8 @@ class AlunoEntity {
       genero: genero ?? this.genero,
       peso: peso ?? this.peso,
       altura: altura ?? this.altura,
+      personalId: personalId ?? this.personalId,
+      userId: userId ?? this.userId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

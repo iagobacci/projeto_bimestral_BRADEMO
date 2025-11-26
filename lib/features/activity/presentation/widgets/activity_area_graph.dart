@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:trabalho01/core/theme/app_theme.dart'; 
-import 'dart:math';
+import 'package:trabalho01/core/theme/app_theme.dart';
 
 class ActivityAreaGraph extends StatelessWidget {
   final Color backgroundColor;
@@ -13,6 +12,13 @@ class ActivityAreaGraph extends StatelessWidget {
     required this.stepsValue,
     required this.graphPoints,
   });
+
+  double _calculateMaxValue() {
+    if (graphPoints.isEmpty) return 0;
+    // Extrai os valores dos pontos (assumindo que o gráfico já está normalizado)
+    // Como os pontos já estão normalizados, precisamos usar o stepsValue como referência
+    return stepsValue.toDouble();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +44,7 @@ class ActivityAreaGraph extends StatelessWidget {
               painter: _AreaGraphPainter(
                 baseColor: baseGreen, 
                 points: graphPoints,
-                // Gera um número aleatório entre 10 e 30
-                randomPercentage: (Random().nextInt(21) + 10), 
+                maxValue: _calculateMaxValue(),
               ), 
             ),
           ),
@@ -59,9 +64,9 @@ class ActivityAreaGraph extends StatelessWidget {
 class _AreaGraphPainter extends CustomPainter {
   final Color baseColor;
   final List<Offset> points; 
-  final int randomPercentage; 
+  final double maxValue; 
 
-  _AreaGraphPainter({required this.baseColor, required this.points, required this.randomPercentage});
+  _AreaGraphPainter({required this.baseColor, required this.points, required this.maxValue});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -120,41 +125,8 @@ class _AreaGraphPainter extends CustomPainter {
     final highlightPaint = Paint()..color = Colors.white; 
     
     canvas.drawCircle(highlightPoint, 5.0, highlightPaint);
-    
-    final percentageRect = Rect.fromCenter(
-      center: Offset(highlightPoint.dx - 10, highlightPoint.dy - 20),
-      width: 40, 
-      height: 20
-    );
-    final percentagePaint = Paint()..color = baseColor.withOpacity(0.8);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(percentageRect, const Radius.circular(5)),
-        percentagePaint);
-        
-    final textSpan = TextSpan(
-      text: '$randomPercentage%', 
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-    
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    );
-
-    textPainter.layout();
-    
-    final textOffset = Offset(
-      percentageRect.center.dx - textPainter.width / 2,
-      percentageRect.center.dy - textPainter.height / 2,
-    );
-    
-    textPainter.paint(canvas, textOffset);
   }
 
   @override
-  bool shouldRepaint(covariant _AreaGraphPainter oldDelegate) => oldDelegate.points != points || oldDelegate.randomPercentage != randomPercentage;
+  bool shouldRepaint(covariant _AreaGraphPainter oldDelegate) => oldDelegate.points != points || oldDelegate.maxValue != maxValue;
 }

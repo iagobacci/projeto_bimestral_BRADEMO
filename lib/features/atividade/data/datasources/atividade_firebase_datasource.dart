@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../domain/entities/atividade_entity.dart';
 
 class AtividadeFirebaseDataSource {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collection = 'atividades';
 
   // CREATE (POST) - Criar nova atividade
@@ -28,13 +30,78 @@ class AtividadeFirebaseDataSource {
     }
   }
 
-  // READ (GET) - Listar todas as atividades
+  // READ (GET) - Listar todas as atividades (filtradas por tipo de usuário)
   Future<List<AtividadeEntity>> getAllAtividades() async {
     try {
-      final querySnapshot = await _db.collection(_collection).get();
-      return querySnapshot.docs
-          .map((doc) => AtividadeEntity.fromMap(doc.id, doc.data()))
-          .toList();
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('Você precisa estar autenticado para listar atividades.');
+      }
+      
+      // Buscar tipo de usuário no Firestore
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final tipoUsuario = userDoc.data()?['tipoUsuario'] ?? 'aluno';
+      
+      QuerySnapshot querySnapshot;
+      
+      if (tipoUsuario == 'aluno') {
+        // Aluno vê apenas suas atividades
+        // Primeiro, buscar o aluno pelo userId
+        final alunoQuery = await _db
+            .collection('alunos')
+            .where('userId', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+        
+        if (alunoQuery.docs.isEmpty) {
+          return []; // Aluno não encontrado, retorna lista vazia
+        }
+        
+        final alunoId = alunoQuery.docs.first.id;
+        
+        // Buscar atividades do aluno
+        querySnapshot = await _db
+            .collection(_collection)
+            .where('alunoId', isEqualTo: alunoId)
+            .get();
+      } else {
+        // Personal vê todas as atividades de seus alunos
+        // Buscar todos os alunos do personal
+        final alunosQuery = await _db
+            .collection('alunos')
+            .where('personalId', isEqualTo: user.uid)
+            .get();
+        
+        if (alunosQuery.docs.isEmpty) {
+          return []; // Nenhum aluno encontrado
+        }
+        
+        final alunoIds = alunosQuery.docs.map((doc) => doc.id).toList();
+        
+        // Buscar atividades de todos os alunos do personal
+        // Firestore não suporta múltiplos valores com 'isEqualTo', então fazemos consultas separadas
+        List<AtividadeEntity> todasAtividades = [];
+        for (final alunoId in alunoIds) {
+          final atividadesQuery = await _db
+              .collection(_collection)
+              .where('alunoId', isEqualTo: alunoId)
+              .get();
+          todasAtividades.addAll(
+            atividadesQuery.docs.map((doc) => AtividadeEntity.fromMap(doc.id, doc.data())).toList(),
+          );
+        }
+        return todasAtividades;
+      }
+      
+      // Se for aluno, retorna a lista normal
+      if (tipoUsuario == 'aluno') {
+        return querySnapshot.docs
+            .map((doc) => AtividadeEntity.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+            .toList();
+      }
+      
+      // Se chegou aqui, é personal mas sem alunos selecionados
+      return [];
     } on FirebaseException catch (e) {
       throw Exception('Erro ao listar atividades: ${e.message}');
     }

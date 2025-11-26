@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/theme/app_theme.dart' show baseGreen, scaffoldBackground, textPrimary, textSecondary, cardBackgroundAlt;
 import '../../../aluno/presentation/controller/aluno_controller.dart';
 import '../../../atividade/presentation/controller/atividade_controller.dart';
 import '../../../medicao/presentation/controller/medicao_controller.dart';
@@ -16,13 +18,58 @@ class RelatoriosScreen extends StatefulWidget {
 
 class _RelatoriosScreenState extends State<RelatoriosScreen> {
   String? _selectedAlunoId;
+  String? _tipoUsuario;
+  bool _isLoadingTipoUsuario = true;
 
   @override
   void initState() {
     super.initState();
+    _loadTipoUsuario();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AlunoController>().loadAlunos();
     });
+  }
+
+  Future<void> _loadTipoUsuario() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        setState(() {
+          _tipoUsuario = userDoc.data()?['tipoUsuario'] ?? 'aluno';
+          _isLoadingTipoUsuario = false;
+        });
+        
+        // Se for aluno, carregar automaticamente o alunoId dele
+        if (_tipoUsuario == 'aluno') {
+          final alunoQuery = await FirebaseFirestore.instance
+              .collection('alunos')
+              .where('userId', isEqualTo: user.uid)
+              .limit(1)
+              .get();
+          if (alunoQuery.docs.isNotEmpty) {
+            setState(() {
+              _selectedAlunoId = alunoQuery.docs.first.id;
+            });
+            context.read<AtividadeController>().loadAtividadesByAluno(_selectedAlunoId!);
+            context.read<MedicaoController>().loadMedicoesByAluno(_selectedAlunoId!);
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _tipoUsuario = 'aluno';
+          _isLoadingTipoUsuario = false;
+        });
+      }
+    } else {
+      setState(() {
+        _tipoUsuario = 'aluno';
+        _isLoadingTipoUsuario = false;
+      });
+    }
   }
 
   @override
@@ -37,101 +84,138 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: scaffoldBackground,
       appBar: AppBar(
-        title: const Text('Relatórios'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Seletor de Aluno
-            Card(
-              color: widgetsColor,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedAlunoId,
-                  decoration: const InputDecoration(
-                    labelText: 'Selecione um Aluno',
-                    labelStyle: TextStyle(color: Colors.white70),
-                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
-                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
-                  ),
-                  dropdownColor: widgetsColor,
-                  style: const TextStyle(color: Colors.white),
-                  items: alunoController.alunos.map((aluno) {
-                    return DropdownMenuItem<String>(
-                      value: aluno.id,
-                      child: Text(aluno.nome),
-                    );
-                  }).toList(),
-                  onChanged: (value) => setState(() => _selectedAlunoId = value),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            if (_selectedAlunoId != null) ...[
-              // Estatísticas Gerais
-              _buildStatsCard(
-                'Estatísticas Gerais',
-                [
-                  _buildStatItem('Total de Atividades', atividadeController.atividades.length.toString()),
-                  _buildStatItem('Total de Medições', medicaoController.medicoes.length.toString()),
-                  if (medicaoController.medicoes.isNotEmpty)
-                    _buildStatItem(
-                      'Média de Batimentos',
-                      (medicaoController.medicoes.map((m) => m.batimentosPorMinuto).reduce((a, b) => a + b) /
-                              medicaoController.medicoes.length)
-                          .toStringAsFixed(0),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Gráfico de Batimentos
-              if (medicaoController.medicoes.isNotEmpty)
-                _buildBatimentosChart(medicaoController.medicoes),
-              const SizedBox(height: 24),
-
-              // Gráfico de Atividades
-              if (atividadeController.atividades.isNotEmpty)
-                _buildAtividadesChart(atividadeController.atividades),
-            ] else
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Text(
-                    'Selecione um aluno para ver os relatórios',
-                    style: TextStyle(color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Relatórios',
+          style: TextStyle(
+            color: textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
+      body: _isLoadingTipoUsuario
+          ? const Center(child: CircularProgressIndicator(color: baseGreen))
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Seletor de Aluno (apenas para personal)
+                  if (_tipoUsuario == 'personal') ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: cardBackgroundAlt,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedAlunoId,
+                          dropdownColor: cardBackgroundAlt,
+                          style: const TextStyle(color: textPrimary),
+                          iconEnabledColor: baseGreen,
+                          hint: const Text('Selecione um aluno', style: TextStyle(color: textSecondary)),
+                          items: alunoController.alunos.map((aluno) {
+                            return DropdownMenuItem<String>(
+                              value: aluno.id,
+                              child: Text(aluno.nome),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() => _selectedAlunoId = value);
+                            if (value != null) {
+                              // Força recarregamento completo dos dados
+                              atividadeController.loadAtividadesByAluno(value);
+                              medicaoController.loadMedicoesByAluno(value);
+                              // Força atualização da UI
+                              Future.delayed(const Duration(milliseconds: 100), () {
+                                setState(() {});
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+
+                          if (_selectedAlunoId != null) ...[
+                            // Estatísticas Gerais
+                            _buildStatsCard(
+                              'Estatísticas Gerais',
+                              [
+                                _buildStatItem('Total de Atividades', atividadeController.atividades.length.toString()),
+                                _buildStatItem('Total de Medições', medicaoController.medicoes.length.toString()),
+                                if (medicaoController.medicoes.isNotEmpty)
+                                  _buildStatItem(
+                                    'Média de Batimentos',
+                                    (medicaoController.medicoes.map((m) => m.batimentosPorMinuto).reduce((a, b) => a + b) /
+                                            medicaoController.medicoes.length)
+                                        .toStringAsFixed(0),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Gráfico de Batimentos
+                            if (medicaoController.medicoes.isNotEmpty)
+                              _buildBatimentosChart(medicaoController.medicoes),
+                            const SizedBox(height: 24),
+
+                            // Gráfico de Atividades
+                            if (atividadeController.atividades.isNotEmpty)
+                              _buildAtividadesChart(atividadeController.atividades),
+                          ] else
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Text(
+                                  'Selecione um aluno para ver os relatórios',
+                                  style: TextStyle(color: textSecondary),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
   Widget _buildStatsCard(String title, List<Widget> stats) {
-    return Card(
-      color: widgetsColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...stats,
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBackgroundAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          ...stats,
+        ],
       ),
     );
   }
@@ -144,7 +228,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(color: Colors.white70),
+            style: const TextStyle(color: textSecondary),
           ),
           Text(
             value,
@@ -159,17 +243,19 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     final sortedMedicoes = List.from(medicoes)
       ..sort((a, b) => a.dataMedicao.compareTo(b.dataMedicao));
 
-    return Card(
-      color: widgetsColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Evolução dos Batimentos Cardíacos',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBackgroundAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Evolução dos Batimentos Cardíacos',
+            style: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
             const SizedBox(height: 16),
             SizedBox(
               height: 200,
@@ -182,7 +268,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                         showTitles: true,
                         getTitlesWidget: (value, meta) => Text(
                           value.toInt().toString(),
-                          style: const TextStyle(color: Colors.white70, fontSize: 10),
+                          style: const TextStyle(color: textSecondary, fontSize: 10),
                         ),
                       ),
                     ),
@@ -194,7 +280,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                             final medicao = sortedMedicoes[value.toInt()];
                             return Text(
                               DateFormat('dd/MM').format(medicao.dataMedicao),
-                              style: const TextStyle(color: Colors.white70, fontSize: 10),
+                              style: const TextStyle(color: textSecondary, fontSize: 10),
                             );
                           }
                           return const Text('');
@@ -221,8 +307,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -233,17 +318,19 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       tipoCount[atividade.tipo] = (tipoCount[atividade.tipo] ?? 0) + 1;
     }
 
-    return Card(
-      color: widgetsColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Distribuição de Atividades por Tipo',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBackgroundAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Distribuição de Atividades por Tipo',
+            style: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
             const SizedBox(height: 16),
             SizedBox(
               height: 200,
@@ -269,10 +356,12 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
+
+
+
 

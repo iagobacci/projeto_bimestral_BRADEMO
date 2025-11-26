@@ -3,6 +3,15 @@ import 'package:flutter/material.dart';
 const Color baseGreen = Color(0xFF29E33C);
 const Color primaryBackground = Color(0xFF151718); 
 const Color widgetsColor = Color(0xFF282A2C);
+const Color scaffoldBackground = Colors.black;
+const Color cardBackground = Color(0xFF161616);
+const Color cardBackgroundAlt = Color(0xFF1A1A1A);
+const Color textPrimary = Colors.white;
+const Color textSecondary = Colors.white70;
+const Color textTertiary = Colors.white54;
+const Color borderColor = Colors.white70;
+const Color errorColor = Colors.red;
+const Color successColor = Color.fromRGBO(128, 249, 136, 1);
 
 final ThemeData darkTheme = ThemeData(
   // Configurações básicas escuras

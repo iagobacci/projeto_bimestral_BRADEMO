@@ -51,12 +51,49 @@ class AlunoFirebaseDataSource {
   // READ (GET) - Listar todos os alunos
   Future<List<AlunoEntity>> getAllAlunos() async {
     try {
-      final querySnapshot = await _db.collection(_collection).get();
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('Você precisa estar autenticado para listar alunos.');
+      }
+      
+      // Buscar tipo de usuário no Firestore
+      final userDoc = await _db.collection('users').doc(user.uid).get();
+      final tipoUsuario = userDoc.data()?['tipoUsuario'] ?? 'aluno';
+      
+      QuerySnapshot querySnapshot;
+      
+      if (tipoUsuario == 'personal') {
+        // Personal vê TODOS os alunos (tanto os que ele criou quanto os que se cadastraram sozinhos)
+        querySnapshot = await _db.collection(_collection).get();
+      } else {
+        // Aluno não deve ver lista de alunos (mas mantém para compatibilidade)
+        querySnapshot = await _db.collection(_collection).get();
+      }
+      
       return querySnapshot.docs
-          .map((doc) => AlunoEntity.fromMap(doc.id, doc.data()))
+          .map((doc) => AlunoEntity.fromMap(doc.id, doc.data() as Map<String, dynamic>))
           .toList();
     } on FirebaseException catch (e) {
       throw Exception('Erro ao listar alunos: ${e.message}');
+    }
+  }
+  
+  // READ (GET) - Buscar aluno por userId (para aluno logado)
+  Future<AlunoEntity?> getAlunoByUserId(String userId) async {
+    try {
+      final querySnapshot = await _db
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isEmpty) {
+        return null;
+      }
+      
+      return AlunoEntity.fromMap(querySnapshot.docs.first.id, querySnapshot.docs.first.data());
+    } on FirebaseException catch (e) {
+      throw Exception('Erro ao buscar aluno por userId: ${e.message}');
     }
   }
 

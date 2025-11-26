@@ -17,10 +17,7 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    // Inicializar timezone
     tz.initializeTimeZones();
-
-    // Solicitar permissão para notificações
     NotificationSettings settings = await _firebaseMessaging.requestPermission(
       alert: true,
       badge: true,
@@ -28,7 +25,6 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      // Inicializar notificações locais
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
@@ -40,15 +36,12 @@ class NotificationService {
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (details) {
-          // Tratar clique na notificação
+          // Aqui vamos definir o que acontece quando o usuário toca na notificação
         },
       );
 
-      // Obter token FCM
       String? token = await _firebaseMessaging.getToken();
       debugPrint('FCM Token: $token');
-
-      // Configurar handlers de mensagens
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
 
@@ -57,7 +50,6 @@ class NotificationService {
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    // Mostrar notificação local quando o app está em foreground
     await _localNotifications.show(
       message.hashCode,
       message.notification?.title ?? 'Nova Notificação',
@@ -76,7 +68,6 @@ class NotificationService {
   }
 
   Future<void> _handleBackgroundMessage(RemoteMessage message) async {
-    // Tratar mensagem quando o app é aberto a partir de uma notificação
     debugPrint('Mensagem recebida: ${message.messageId}');
   }
 
@@ -96,6 +87,7 @@ class NotificationService {
           channelDescription: 'Notificações do HealthPulse',
           importance: Importance.high,
           priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
         ),
         iOS: DarwinNotificationDetails(),
       ),
@@ -108,7 +100,6 @@ class NotificationService {
     required String body,
     required DateTime scheduledDate,
   }) async {
-    // Agendar notificação local
     await _localNotifications.zonedSchedule(
       scheduledDate.millisecondsSinceEpoch.remainder(100000),
       title,
@@ -130,7 +121,6 @@ class NotificationService {
   }
 }
 
-// Handler para mensagens em background (deve ser uma função top-level)
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Mensagem em background: ${message.messageId}');

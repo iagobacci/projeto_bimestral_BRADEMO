@@ -18,6 +18,7 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
+  final _senhaController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _pesoController = TextEditingController();
   final _alturaController = TextEditingController();
@@ -42,6 +43,7 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
   void dispose() {
     _nomeController.dispose();
     _emailController.dispose();
+    _senhaController.dispose();
     _telefoneController.dispose();
     _pesoController.dispose();
     _alturaController.dispose();
@@ -49,12 +51,28 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final now = DateTime.now();
+    final hundredYearsAgo = DateTime(now.year - 100, now.month, now.day);
     final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _dataNascimento ?? DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-    );
+        context: context,
+        initialDate: widget.aluno?.dataNascimento ?? now,
+        firstDate: hundredYearsAgo,
+        lastDate: now,
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: Color.fromRGBO(41, 227, 60, 1),
+                onPrimary: Colors.black,
+                surface: Color(0xFF1A1A1A),
+                onSurface: Colors.white,
+              ),
+              dialogBackgroundColor: Colors.black,
+            ),
+            child: child!,
+          );
+        },
+      );
     if (picked != null) {
       setState(() {
         _dataNascimento = picked;
@@ -86,7 +104,9 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
 
     bool success;
     if (widget.aluno == null) {
-      success = await controller.createAluno(aluno);
+      // Ao criar, passar a senha para criar usuário no Auth
+      final senha = _senhaController.text.trim();
+      success = await controller.createAluno(aluno, senha: senha);
     } else {
       success = await controller.updateAluno(widget.aluno!.id!, aluno);
     }
@@ -143,6 +163,26 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
                 return null;
               },
             ),
+            // Campo de senha apenas para criação de novo aluno
+            if (widget.aluno == null) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _senhaController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
+                ),
+                style: const TextStyle(color: Colors.white),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Senha é obrigatória';
+                  if (value!.length < 6) return 'A senha deve ter no mínimo 6 caracteres';
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 16),
             TextFormField(
               controller: _telefoneController,
@@ -167,7 +207,7 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _genero,
+              initialValue: _genero,
               decoration: const InputDecoration(
                 labelText: 'Gênero (opcional)',
                 labelStyle: TextStyle(color: Colors.white70),
@@ -219,4 +259,5 @@ class _AlunoFormScreenState extends State<AlunoFormScreen> {
     );
   }
 }
+
 

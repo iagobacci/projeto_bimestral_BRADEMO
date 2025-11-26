@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../controller/medicao_controller.dart';
 import '../../domain/entities/medicao_entity.dart';
@@ -9,8 +11,9 @@ import '../../../aluno/presentation/controller/aluno_controller.dart';
 
 class MedicaoFormScreen extends StatefulWidget {
   final MedicaoEntity? medicao;
+  final String? preSelectedAlunoId; // Para pré-selecionar aluno
 
-  const MedicaoFormScreen({super.key, this.medicao});
+  const MedicaoFormScreen({super.key, this.medicao, this.preSelectedAlunoId});
 
   @override
   State<MedicaoFormScreen> createState() => _MedicaoFormScreenState();
@@ -28,6 +31,7 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
   double? _latitude;
   double? _longitude;
   bool _isLoadingLocation = false;
+  String? _tipoUsuario = 'aluno'; // Inicializar com 'aluno' como padrão
 
   @override
   void initState() {
@@ -44,6 +48,31 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
       _longitude = widget.medicao!.longitude;
     } else {
       _dataMedicao = DateTime.now();
+      _selectedAlunoId = widget.preSelectedAlunoId;
+    }
+    _loadTipoUsuario();
+  }
+
+  Future<void> _loadTipoUsuario() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        setState(() {
+          _tipoUsuario = userDoc.data()?['tipoUsuario'] ?? 'aluno';
+        });
+      } catch (e) {
+        setState(() {
+          _tipoUsuario = 'aluno';
+        });
+      }
+    } else {
+      setState(() {
+        _tipoUsuario = 'aluno';
+      });
     }
   }
 
@@ -126,11 +155,25 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _dataMedicao ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-    );
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2030),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: Color.fromRGBO(41, 227, 60, 1),
+                onPrimary: Colors.black,
+                surface: Color(0xFF1A1A1A),
+                onSurface: Colors.white,
+              ),
+              dialogBackgroundColor: Colors.black,
+            ),
+            child: child!,
+          );
+        },
+      );
     if (picked != null) {
       setState(() {
         _dataMedicao = picked;
@@ -146,7 +189,10 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
       );
       return;
     }
-    if (_selectedAlunoId == null) {
+    // Para personal, usar o aluno selecionado ou o pré-selecionado
+    final alunoIdToUse = _selectedAlunoId ?? widget.preSelectedAlunoId;
+    
+    if (alunoIdToUse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, selecione um aluno')),
       );
@@ -156,7 +202,7 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
     final controller = context.read<MedicaoController>();
     final medicao = MedicaoEntity(
       id: widget.medicao?.id,
-      alunoId: _selectedAlunoId!,
+      alunoId: alunoIdToUse,
       batimentosPorMinuto: int.parse(_batimentosController.text.trim()),
       pressaoSistolica: _pressaoSistolicaController.text.trim().isEmpty ? null : double.tryParse(_pressaoSistolicaController.text.trim()),
       pressaoDiastolica: _pressaoDiastolicaController.text.trim().isEmpty ? null : double.tryParse(_pressaoDiastolicaController.text.trim()),
@@ -190,6 +236,43 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
   @override
   Widget build(BuildContext context) {
     final alunoController = context.watch<AlunoController>();
+    
+    // Carregar alunos se ainda não foram carregados (especialmente importante para personal)
+    if (alunoController.alunos.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        alunoController.loadAlunos();
+      });
+    }
+    
+    // Se for personal e não tiver alunos carregados, garantir que carregue
+    if (_tipoUsuario == 'personal' && alunoController.alunos.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        alunoController.loadAlunos();
+      });
+    }
+    
+    // Se for aluno, obter automaticamente o alunoId
+    if (_tipoUsuario == 'aluno' && _selectedAlunoId == null && widget.preSelectedAlunoId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            final alunoQuery = await FirebaseFirestore.instance
+                .collection('alunos')
+                .where('userId', isEqualTo: user.uid)
+                .limit(1)
+                .get();
+            if (alunoQuery.docs.isNotEmpty && mounted) {
+              setState(() {
+                _selectedAlunoId = alunoQuery.docs.first.id;
+              });
+            }
+          } catch (e) {
+            // Erro ao buscar aluno
+          }
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -201,25 +284,70 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            DropdownButtonFormField<String>(
-              value: _selectedAlunoId,
-              decoration: const InputDecoration(
-                labelText: 'Aluno *',
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
+            // Dropdown de aluno: sempre mostrar se for personal (mesmo que tenha preSelectedAlunoId)
+            if (_tipoUsuario == 'personal' && widget.medicao == null)
+              DropdownButtonFormField<String>(
+                value: _selectedAlunoId ?? widget.preSelectedAlunoId,
+                decoration: const InputDecoration(
+                  labelText: 'Aluno *',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
+                ),
+                dropdownColor: widgetsColor,
+                style: const TextStyle(color: Colors.white),
+                items: alunoController.alunos.isEmpty
+                    ? [const DropdownMenuItem(value: null, child: Text('Carregando alunos...'))]
+                    : alunoController.alunos.map((aluno) {
+                        return DropdownMenuItem<String>(
+                          value: aluno.id,
+                          child: Text(aluno.nome),
+                        );
+                      }).toList(),
+                onChanged: (value) => setState(() => _selectedAlunoId = value),
+                validator: (value) {
+                  final selectedValue = value ?? widget.preSelectedAlunoId;
+                  return selectedValue == null ? 'Selecione um aluno' : null;
+                },
               ),
-              dropdownColor: widgetsColor,
-              style: const TextStyle(color: Colors.white),
-              items: alunoController.alunos.map((aluno) {
-                return DropdownMenuItem<String>(
-                  value: aluno.id,
-                  child: Text(aluno.nome),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedAlunoId = value),
-              validator: (value) => value == null ? 'Selecione um aluno' : null,
-            ),
+            // Se for aluno e não tiver pré-selecionado, mostrar dropdown também
+            if (_tipoUsuario == 'aluno' && widget.preSelectedAlunoId == null && widget.medicao == null)
+              DropdownButtonFormField<String>(
+                value: _selectedAlunoId,
+                decoration: const InputDecoration(
+                  labelText: 'Aluno *',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
+                ),
+                dropdownColor: widgetsColor,
+                style: const TextStyle(color: Colors.white),
+                items: alunoController.alunos.isEmpty
+                    ? [const DropdownMenuItem(value: null, child: Text('Carregando...'))]
+                    : alunoController.alunos.map((aluno) {
+                        return DropdownMenuItem<String>(
+                          value: aluno.id,
+                          child: Text(aluno.nome),
+                        );
+                      }).toList(),
+                onChanged: (value) => setState(() => _selectedAlunoId = value),
+                validator: (value) => value == null ? 'Selecione um aluno' : null,
+              ),
+            // Campo readonly apenas se for aluno e tiver pré-selecionado
+            if (_tipoUsuario == 'aluno' && widget.preSelectedAlunoId != null && widget.medicao == null && _selectedAlunoId != null && alunoController.alunos.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: alunoController.alunos.firstWhere((a) => a.id == _selectedAlunoId, orElse: () => alunoController.alunos.first).nome,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Aluno',
+                  labelStyle: TextStyle(color: Colors.white70),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white70)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: baseGreen)),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
             const SizedBox(height: 16),
             TextFormField(
               controller: _batimentosController,
@@ -326,7 +454,12 @@ class _MedicaoFormScreenState extends State<MedicaoFormScreen> {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _save,
-              child: const Text('Salvar'),
+              child: const Text(
+                'Salvar', 
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),

@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:trabalho01/core/theme/app_theme.dart';
 import 'package:trabalho01/core/services/notification_service.dart' show NotificationService, firebaseMessagingBackgroundHandler;
+import 'package:trabalho01/features/settings_screen/settings_screen.dart';
 import 'package:trabalho01/features/splash_screen/presentation/controller/splash_controller.dart';
 import 'package:trabalho01/features/splash_screen/presentation/pages/splash_screen.dart'; 
 
@@ -44,76 +45,65 @@ import 'features/authentication/data/datasources/auth_firebase_datasource.dart';
 import 'features/form_screen/data/repositories/auth_repository_impl.dart'; 
 
 
-// Ponto de entrada do aplicativo
 void main() async {
-  // Garante que o Flutter Binding esteja inicializado para chamadas nativas (Firebase)
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicializa o Firebase usando as opções da plataforma
   await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform, 
   );
 
-  // Configurar handler de mensagens em background
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Inicializar serviço de notificações
   await NotificationService().initialize();
   
   runApp(const MyApp()); 
 }
 
-// Widget principal que configura o tema e as rotas
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // --- Configuração da Injeção de Dependência ---
-    
-    // Auth
+    // Configurando as dependências do app
     final authDataSource = AuthFirebaseDataSource();
     final authRepository = AuthRepositoryImpl(authDataSource);
     
-    // Aluno
     final alunoDataSource = AlunoFirebaseDataSource();
     final alunoRepository = AlunoRepositoryImpl(alunoDataSource);
     
-    // Atividade
     final atividadeDataSource = AtividadeFirebaseDataSource();
     final atividadeRepository = AtividadeRepositoryImpl(atividadeDataSource);
     
-    // Medição
     final medicaoDataSource = MedicaoFirebaseDataSource();
     final medicaoRepository = MedicaoRepositoryImpl(medicaoDataSource);
     
-    // --- MultiProvider para injetar Controllers em todas as Rotas ---
-    
     return MultiProvider(
       providers: [
-        // Controller do Formulário (Recebe o Repositório via injeção para cadastro Firebase)
         ChangeNotifierProvider(
           create: (_) => FormController(
             authRepository: authRepository, 
           ),
         ),
-        
-        // Outros Controllers
         Provider<SplashController>(create: (_) => SplashController()),
-        ChangeNotifierProvider(create: (_) => HomeController()),
-        ChangeNotifierProvider(create: (_) => ActivityController()),
+        ChangeNotifierProvider(
+          create: (_) => HomeController(
+            alunoRepository: alunoRepository,
+            medicaoRepository: medicaoRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ActivityController(
+            atividadeRepository: atividadeRepository,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => PulseController()),
-        
-        // Controllers de CRUD
         ChangeNotifierProvider(create: (_) => AlunoController(alunoRepository)),
         ChangeNotifierProvider(create: (_) => AtividadeController(atividadeRepository)),
         ChangeNotifierProvider(create: (_) => MedicaoController(medicaoRepository)),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'HealthPulse', 
-        
-        // Definição de Tema
+        title: 'HealthPulse',
         theme: ThemeData(
           primaryColor: baseGreen, 
           colorScheme: ColorScheme.fromSeed(seedColor: baseGreen),
@@ -131,12 +121,10 @@ class MyApp extends StatelessWidget {
           ),
         ),
         
-        // Tela inicial
         initialRoute: '/splash',
 
-        // Mapa de Rotas
         routes: {
-          // As rotas usam os Controllers injetados acima no MultiProvider
+        
           '/splash': (context) => const SplashScreen(),
           '/home': (context) => const Home(),
           '/form': (context) => const FormScreen(),
@@ -144,9 +132,10 @@ class MyApp extends StatelessWidget {
           '/activity': (context) => const ActivityScreen(),
           '/login': (context) => const LoginScreen(),
           '/alunos': (context) => const AlunoListScreen(),
-          '/atividades': (context) => const AtividadeListScreen(),
           '/medicoes': (context) => const MedicaoListScreen(),
           '/relatorios': (context) => const RelatoriosScreen(),
+          '/settings': (context) => const SettingsScreen(),
+          '/atividades': (context) => const AtividadeListScreen()
         },
       ),
     );

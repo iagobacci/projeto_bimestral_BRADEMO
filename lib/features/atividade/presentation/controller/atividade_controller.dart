@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/atividade_entity.dart';
 import '../../domain/repositories/atividade_repository.dart';
+import '../../../../core/services/notification_service.dart';
 
 class AtividadeController extends ChangeNotifier {
   final AtividadeRepository repository;
@@ -57,7 +58,13 @@ class AtividadeController extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
       await repository.createAtividade(atividadeWithDates);
-      await loadAtividades();
+      // Notificação local ao criar atividade
+      await NotificationService().showLocalNotification(
+        title: 'Nova atividade criada',
+        body: 'Atividade "${atividade.tipo}" registrada com sucesso.',
+      );
+      // Recarrega baseado no alunoId da atividade
+      await loadAtividadesByAluno(atividade.alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao criar atividade: ${e.toString()}';
@@ -73,7 +80,8 @@ class AtividadeController extends ChangeNotifier {
 
     try {
       await repository.updateAtividade(id, atividade);
-      await loadAtividades();
+      // Recarrega baseado no alunoId da atividade
+      await loadAtividadesByAluno(atividade.alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar atividade: ${e.toString()}';
@@ -88,8 +96,11 @@ class AtividadeController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Salvar alunoId antes de deletar
+      final alunoId = _atividades.firstWhere((a) => a.id == id).alunoId;
       await repository.deleteAtividade(id);
-      await loadAtividades();
+      // Recarrega baseado no alunoId
+      await loadAtividadesByAluno(alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao deletar atividade: ${e.toString()}';
@@ -98,4 +109,5 @@ class AtividadeController extends ChangeNotifier {
     }
   }
 }
+
 

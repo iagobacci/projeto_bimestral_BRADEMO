@@ -15,17 +15,19 @@ class AuthRepositoryImpl {
     required String email, 
     required String nome,
     required String senha,
-    required String? genero, // Pode ser null
+    required String? genero, 
     required bool lembrarSenha,
     required bool notificacoes,
+    required String tipoUsuario,
   }) async {
-    // CORREÇÃO: Tratamento de Nulos antes do envio ao Firestore
+    // Tratamento de Nulos antes do envio ao Firestore
     final finalGenero = genero ?? 'Não informado'; 
 
     final userData = {
       'email': email,
       'nome': nome,
-      'genero': finalGenero, // Garante que não é null
+      'genero': finalGenero, 
+      'tipoUsuario': tipoUsuario,
       'lembrarSenha': lembrarSenha,
       'notificacoes': notificacoes,
       // FieldValue.serverTimestamp() é seguro

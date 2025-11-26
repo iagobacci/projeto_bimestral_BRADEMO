@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/medicao_entity.dart';
 import '../../domain/repositories/medicao_repository.dart';
+import '../../../../core/services/notification_service.dart';
 
 class MedicaoController extends ChangeNotifier {
   final MedicaoRepository repository;
@@ -47,6 +48,15 @@ class MedicaoController extends ChangeNotifier {
     }
   }
 
+  // Método para recarregar medições baseado no tipo de usuário
+  Future<void> reloadMedicoes({String? alunoId}) async {
+    if (alunoId != null) {
+      await loadMedicoesByAluno(alunoId);
+    } else {
+      await loadMedicoes();
+    }
+  }
+
   Future<bool> createMedicao(MedicaoEntity medicao) async {
     _isLoading = true;
     _error = null;
@@ -57,7 +67,13 @@ class MedicaoController extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
       await repository.createMedicao(medicaoWithDates);
-      await loadMedicoes();
+      // Notificação local ao criar medição
+      await NotificationService().showLocalNotification(
+        title: 'Nova medição registrada',
+        body: 'Medição de batimentos ${medicao.batimentosPorMinuto} bpm salva com sucesso.',
+      );
+      // Recarrega baseado no alunoId da medição
+      await loadMedicoesByAluno(medicao.alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao criar medição: ${e.toString()}';
@@ -73,7 +89,8 @@ class MedicaoController extends ChangeNotifier {
 
     try {
       await repository.updateMedicao(id, medicao);
-      await loadMedicoes();
+      // Recarrega baseado no alunoId da medição
+      await loadMedicoesByAluno(medicao.alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar medição: ${e.toString()}';
@@ -88,8 +105,11 @@ class MedicaoController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Salvar alunoId antes de deletar
+      final alunoId = _medicoes.firstWhere((m) => m.id == id).alunoId;
       await repository.deleteMedicao(id);
-      await loadMedicoes();
+      // Recarrega baseado no alunoId
+      await loadMedicoesByAluno(alunoId);
       return true;
     } catch (e) {
       _error = 'Erro ao deletar medição: ${e.toString()}';
@@ -98,4 +118,5 @@ class MedicaoController extends ChangeNotifier {
     }
   }
 }
+
 

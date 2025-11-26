@@ -59,7 +59,7 @@ class AuthFirebaseDataSource {
     }
   }
 
-  // Implementação de Login (signIn - Corrigida para mapeamento seguro)
+  // Implementação de Login com mapeamento seguro
   Future<UserEntity> signIn(String email, String password) async {
     final userCredential = await _auth.signInWithEmailAndPassword(
       email: email,
@@ -76,13 +76,13 @@ class AuthFirebaseDataSource {
     }
 
     final data = doc.data()!;
-    // CORREÇÃO: Usando '??' para garantir que não haja falha se um campo for nulo
     return UserEntity(
       uid: uid,
       nome: data['nome'] ?? 'Usuário Sem Nome', 
       email: data['email'] ?? email,
       genero: data['genero'],
       profilePhotoUrl: data['profilePhotoUrl'],
+      tipoUsuario: data['tipoUsuario'] ?? 'aluno', // Padrão é aluno
     );
   }
 }

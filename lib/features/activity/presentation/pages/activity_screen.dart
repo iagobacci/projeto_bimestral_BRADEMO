@@ -17,10 +17,30 @@ String _formatDate(DateTime date) {
 }
 
 // Classe principal de montagem da tela
-class ActivityScreen extends StatelessWidget {
+class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
 
-  
+  @override
+  State<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends State<ActivityScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ActivityController>().refresh();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Atualiza quando a tela é exibida novamente (ex: voltando da criação de atividade)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ActivityController>().refresh();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +61,22 @@ class ActivityScreen extends StatelessWidget {
         title: const Text('Atividade'), 
         centerTitle: true, 
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () async {
+              final controller = context.read<ActivityController>();
+              await controller.refresh();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Dados atualizados!'),
+                    backgroundColor: Color.fromRGBO(41, 227, 60, 1),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector( 
@@ -106,11 +142,14 @@ class ActivityScreen extends StatelessWidget {
       ),
       // Barra de navegação inferior
       bottomNavigationBar: CustomBottomNav(
-        componentColor: grayComponentColor,
-        onHomeTap: () => Navigator.pop(context), 
-        onActivityTap: () {},
-        activePath: 'assets/icons/icon4.png',
-      ),
+      componentColor: widgetsColor,
+      activeKey: 'atividades',
+      onHomeTap: () => Navigator.pushNamed(context, '/home'),
+      onTreinoTap: () => Navigator.pushNamed(context, '/atividades'),
+      onAtividadesTap: () => Navigator.pushNamed(context, '/activity'),
+      onConfigTap: () => Navigator.pushNamed(context, '/settings'),
+
+    ),
     );
   }
 
@@ -149,12 +188,22 @@ class ActivityScreen extends StatelessWidget {
   }
   
   Widget _buildDetailStats() {
-    return const Row(
+    final controller = context.watch<ActivityController>();
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        ActivityStatItem(value: '8.42', label: 'Distância'), 
-        ActivityStatItem(value: '1.540', label: 'Calorias'), 
-        ActivityStatItem(value: '3:24', label: 'Tempo'), 
+        ActivityStatItem(
+          value: controller.currentDistance.toStringAsFixed(2),
+          label: 'Distância',
+        ), 
+        ActivityStatItem(
+          value: controller.currentCalories.toString(),
+          label: 'Calorias',
+        ), 
+        ActivityStatItem(
+          value: controller.currentTime,
+          label: 'Tempo',
+        ), 
       ],
     );
   }

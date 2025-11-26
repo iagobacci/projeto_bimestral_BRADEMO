@@ -4,6 +4,7 @@ class UserEntity {
   final String email;
   final String? genero;
   final String? profilePhotoUrl;
+  final String tipoUsuario; // 'aluno' ou 'personal'
   
   UserEntity({
     required this.uid,
@@ -11,5 +12,6 @@ class UserEntity {
     required this.email,
     this.genero,
     this.profilePhotoUrl,
+    this.tipoUsuario = 'aluno', // Padrão é aluno
   });
 }
